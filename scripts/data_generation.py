@@ -61,14 +61,19 @@ def process_mnist():
     test_data = test_dataset.data.view(test_dataset.data.size(0), -1).numpy()
     test_targets = test_dataset.targets.numpy()
 
+    # Define the output directory for MNIST CSV files
+    mnist_output_dir = 'data/mnist'
+    if not os.path.exists(mnist_output_dir):
+        os.makedirs(mnist_output_dir)
+
     # Save the flattened training and test sets to .csv files
     train_df = pd.DataFrame(train_data)
     train_df['label'] = train_targets
-    train_df.to_csv('mnist_train.csv', index=False)
+    train_df.to_csv(os.path.join(mnist_output_dir, 'mnist_train.csv'), index=False)
 
     test_df = pd.DataFrame(test_data)
     test_df['label'] = test_targets
-    test_df.to_csv('mnist_test.csv', index=False)
+    test_df.to_csv(os.path.join(mnist_output_dir, 'mnist_test.csv'), index=False)
 
     # Map the original targets to binary labels
     train_binary_labels = [1 if target % 2 == 0 else -1 for target in train_targets]
@@ -76,30 +81,39 @@ def process_mnist():
 
     # Save the binary labeled datasets
     train_df['binary_label'] = train_binary_labels
-    train_df.to_csv('binary_mnist_train.csv', index=False)
+    train_df.to_csv(os.path.join(mnist_output_dir, 'binary_mnist_train.csv'), index=False)
 
     test_df['binary_label'] = test_binary_labels
-    test_df.to_csv('binary_mnist_test.csv', index=False)
+    test_df.to_csv(os.path.join(mnist_output_dir, 'binary_mnist_test.csv'), index=False)
 
     print("MNIST files saved successfully.")
 
 
 if __name__ == "__main__":
     # Parse command-line arguments
-    parser = argparse.ArgumentParser(description="Generate data on the surface of a unit sphere and save it to a CSV file.")
-    parser.add_argument("-d", "--dimension", type=int, required=True, help="Dimension of the space (d-1 dimensional sphere).")
-    parser.add_argument("-N", "--points", type=int, required=True, help="Number of points to generate.")
-    parser.add_argument("-o", "--output-dir", type=str, default="data\synthetic",
+    parser = argparse.ArgumentParser(description="Generate data on the surface of a unit sphere or process MNIST dataset.")
+    parser.add_argument("-s", "--synth", action="store_true", help="Flag to generate synthetic data.")
+    parser.add_argument("-m", "--mnist", action="store_true", help="Flag to process MNIST dataset.")
+    parser.add_argument("-d", "--dimension", type=int, help="Dimension of the space (d-1 dimensional sphere). Required for synthetic data generation.")
+    parser.add_argument("-N", "--points", type=int, help="Number of points to generate. Required for synthetic data generation.")
+    parser.add_argument("-o", "--output-dir", type=str, default="data/synthetic",
                         help="Output directory for saving the CSV file.")
     #parser.add_argument("-f", "--filename", type=str, default="points_on_sphere.csv", help="Filename for the CSV file.")
 
     args = parser.parse_args()
 
-    # Generate data
-    data = generate_data(args.dimension, args.points)
+    if args.synth:
+        if args.dimension is None or args.points is None:
+            raise ValueError("Both dimension and points must be specified for synthetic data generation.")
+        # Generate data
+        data = generate_data(args.dimension, args.points)
+        # Construct filename with specific dimensionality and sample size
+        filename = f"synt_d{args.dimension}_n{args.points}.csv"
+        # Save data to CSV
+        make_csv(data, args.output_dir, filename)
+    elif args.mnist:
+        process_mnist()
+    else:
+        print("Please specify either --synth or --mnist flag.")
 
-    # Construct filename with specific dimensionality and sample size
-    filename = f"synt_d{args.dimension}_n{args.points}"
 
-    # Save data to CSV
-    make_csv(data, args.output_dir, filename)
