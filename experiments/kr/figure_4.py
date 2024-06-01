@@ -1,22 +1,8 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.metrics import mean_squared_error
-from tqdm import tqdm
-
-from sklearn.linear_model import Ridge
 from sklearn.preprocessing import FunctionTransformer
-
-X, y = mglearn.datasets.make_wave(n_samples=100)
-line = np.linspace(-3, 3, 1000, endpoint=False).reshape(-1, 1)
-reg = Ridge().fit(X, y)
-print("Weights:",reg.coef_)
-fig = plt.figure(figsize=(8*fig_scale,4*fig_scale))
-plt.plot(line, reg.predict(line), label="linear regression", lw=2*fig_scale)
-
-plt.plot(X[:, 0], y, 'o', c='k')
-plt.ylabel("Regression output")
-plt.xlabel("Input feature")
-plt.legend(loc="best");
+from tqdm import tqdm
 
 
 def generate_data(d, N):
@@ -27,20 +13,26 @@ def generate_data(d, N):
     S_d = points / norms
     return S_d
 
-def gaussian_kernel(X, Y, sigma=1.0):
-    pairwise_sq_dists = np.sum((X[:, np.newaxis, :] - Y[np.newaxis, :, :]) ** 2, axis=-1)
-    return np.exp(-pairwise_sq_dists / (2 * sigma ** 2))
+
+def gaussian_kernel_transformer(w=1.0):
+    def kernel(X):
+        pairwise_sq_dists = np.sum((X[:, np.newaxis, :] - X[np.newaxis, :, :]) ** 2, axis=-1)
+        return np.exp(-w ** 2 * pairwise_sq_dists)
+
+    return FunctionTransformer(kernel, validate=False)
 
 
-def kernel_ridge_regression(X_train, y_train, X_test, ridge=0.1, sigma=1.0):
-    K = gaussian_kernel(X_train, X_train, sigma) + ridge * np.eye(X_train.shape[0])
-    alpha = np.linalg.solve(K, y_train)
-    K_test = gaussian_kernel(X_test, X_train, sigma)
+def kernel_ridge_regression(X_train, y_train, X_test, w=1.0, ridge=0.1):
+    kernel_transformer = gaussian_kernel_transformer(w=w)
+    K_train = kernel_transformer.transform(X_train)
+    K_train += ridge * np.eye(K_train.shape[0])
+    alpha = np.linalg.solve(K_train, y_train)
+    K_test = np.exp(-w ** 2 * np.sum((X_test[:, np.newaxis, :] - X_train[np.newaxis, :, :]) ** 2, axis=-1))
     y_pred = K_test @ alpha
     return y_pred
 
 
-def experiment(d, sample_sizes, num_runs=100):
+def experiment(d, sample_sizes, num_runs=100, w=1.0):
     mse_results = {size: [] for size in sample_sizes}
 
     for _ in tqdm(range(num_runs), desc=f"Dimension {d}"):
@@ -50,7 +42,7 @@ def experiment(d, sample_sizes, num_runs=100):
             X_test = generate_data(d, 100)  # Test set size fixed to 100
             y_test = np.zeros(100)  # Clean labels
 
-            y_pred = kernel_ridge_regression(X_train, y_train, X_test, ridge=0.1, sigma=1.0)
+            y_pred = kernel_ridge_regression(X_train, y_train, X_test, w=w, ridge=0.1)
             mse = mean_squared_error(y_test, y_pred)
             mse_results[size].append(mse)
 
@@ -86,6 +78,6 @@ if __name__ == "__main__":
 
     results = {}
     for d in dimensions:
-        results[d] = experiment(d, sample_sizes, num_runs=100)
+        results[d] = experiment(d, sample_sizes, num_runs=100, w=1.0)
 
     plot_results(results, sample_sizes, dimensions)
