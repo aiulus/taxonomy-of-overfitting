@@ -3,6 +3,21 @@ import matplotlib.pyplot as plt
 from sklearn.metrics import mean_squared_error
 from tqdm import tqdm
 
+from sklearn.linear_model import Ridge
+from sklearn.preprocessing import FunctionTransformer
+
+X, y = mglearn.datasets.make_wave(n_samples=100)
+line = np.linspace(-3, 3, 1000, endpoint=False).reshape(-1, 1)
+reg = Ridge().fit(X, y)
+print("Weights:",reg.coef_)
+fig = plt.figure(figsize=(8*fig_scale,4*fig_scale))
+plt.plot(line, reg.predict(line), label="linear regression", lw=2*fig_scale)
+
+plt.plot(X[:, 0], y, 'o', c='k')
+plt.ylabel("Regression output")
+plt.xlabel("Input feature")
+plt.legend(loc="best");
+
 
 def generate_data(d, N):
     u = np.zeros(d)
@@ -11,7 +26,6 @@ def generate_data(d, N):
     norms = np.linalg.norm(points, axis=1, keepdims=True)
     S_d = points / norms
     return S_d
-
 
 def gaussian_kernel(X, Y, sigma=1.0):
     pairwise_sq_dists = np.sum((X[:, np.newaxis, :] - Y[np.newaxis, :, :]) ** 2, axis=-1)
