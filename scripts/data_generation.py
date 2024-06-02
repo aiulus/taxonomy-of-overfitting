@@ -130,18 +130,16 @@ def process_cifar():
     print("CIFAR-10 files saved successfully.")
 
 
-
-
 if __name__ == "__main__":
     # Parse command-line arguments
-    parser = argparse.ArgumentParser(description="Generate data on the surface of a unit sphere or process MNIST dataset.")
+    parser = argparse.ArgumentParser(description="Generate data on the surface of a unit sphere or process datasets.")
     parser.add_argument("-s", "--synth", action="store_true", help="Flag to generate synthetic data.")
     parser.add_argument("-m", "--mnist", action="store_true", help="Flag to process MNIST dataset.")
+    parser.add_argument("-c", "--cifar", action="store_true", help="Flag to process CIFAR-10 dataset.")
     parser.add_argument("-d", "--dimension", type=int, help="Dimension of the space (d-1 dimensional sphere). Required for synthetic data generation.")
     parser.add_argument("-N", "--points", type=int, help="Number of points to generate. Required for synthetic data generation.")
     parser.add_argument("-o", "--output-dir", type=str, default="data/synthetic",
                         help="Output directory for saving the CSV file.")
-    #parser.add_argument("-f", "--filename", type=str, default="points_on_sphere.csv", help="Filename for the CSV file.")
 
     args = parser.parse_args()
 
@@ -156,7 +154,9 @@ if __name__ == "__main__":
         make_csv(data, args.output_dir, filename)
     elif args.mnist:
         process_mnist()
+    elif args.cifar:
+        process_cifar()
     else:
-        print("Please specify either --synth or --mnist flag.")
+        print("Please specify either --synth, --mnist, or --cifar flag.")
 
 
