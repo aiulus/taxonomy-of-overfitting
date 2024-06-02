@@ -7,7 +7,7 @@ from tqdm import tqdm
 import argparse
 from typing import Tuple, List, Dict
 
-from torch.utils.data import DataLoader, Subset, Dataset
+from torch.utils.data import DataLoader, Subset, Dataset, TensorDataset
 from torchvision import transforms
 import torch.nn as nn
 import torch.optim as optim
@@ -90,6 +90,19 @@ def train_model(
     return test_loss, accuracy
 
 
+def save_results(avg_results: Dict[int, Dict[float, Tuple[float, float]]], log_dir: str) -> None:
+    """
+    Save the average results to a log file.
+    """
+    os.makedirs(log_dir, exist_ok=True)
+    log_file = os.path.join(log_dir, 'results.txt')
+    with open(log_file, 'w') as f:
+        for size in avg_results:
+            for noise in avg_results[size]:
+                mean, std = avg_results[size][noise]
+                f.write(f'Size: {size}, Noise: {noise}, Mean: {mean}, Std: {std}\n')
+
+
 def experiment(
         train_sizes: List[int],
         noise_levels: List[float],
@@ -99,7 +112,8 @@ def experiment(
         test_path: str,
         lr: float,
         momentum: float,
-        batch_size: int
+        batch_size: int,
+        results_dir: str
 ) -> None:
     """
     Conduct the experiment with various training sizes, noise levels, and trials.
@@ -117,11 +131,13 @@ def experiment(
             for trial in range(trials):
                 subset_indices = random.sample(range(len(train_dataset)), size)
                 subset = Subset(train_dataset, subset_indices)
-
-                noisy_labels = add_label_noise(subset.targets, noise)
+                subset_data, subset_labels = zip(*[(item[0], item[1]) for item in subset])
+                subset_data = torch.stack(subset_data)
+                subset_labels = torch.tensor(subset_labels)
+                noisy_labels = add_label_noise(subset_labels, noise)
                 binary_labels = labels_to_binary(noisy_labels)
 
-                train_loader = DataLoader(list(zip(subset, binary_labels)), batch_size=batch_size, shuffle=True)
+                train_loader = DataLoader(TensorDataset(subset_data, binary_labels), batch_size=batch_size, shuffle=True)
 
                 model = wide_resnet(depth=28, num_classes=2, widen_factor=10, dropRate=0.3).to(device)
                 criterion = nn.CrossEntropyLoss()
@@ -139,7 +155,13 @@ def experiment(
         size: {noise: (np.mean(all_results[size][noise]), np.std(all_results[size][noise])) for noise in noise_levels}
         for size in train_sizes}
 
+    # Save results
+    log_dir = os.path.join(results_dir, 'logs')
+    save_results(avg_results, log_dir)
+
     # Plotting results
+    graph_dir = os.path.join(results_dir, 'graphs')
+    os.makedirs(graph_dir, exist_ok=True)
     plt.figure(figsize=(12, 6))
     for size in train_sizes:
         noise_levels_list = sorted(avg_results[size].keys())
@@ -152,6 +174,8 @@ def experiment(
     plt.ylabel("Test Error")
     plt.legend()
     plt.grid(True)
+    plt_path = os.path.join(graph_dir, 'results_plot.png')
+    plt.savefig(plt_path)
     plt.show()
 
 
@@ -167,7 +191,8 @@ if __name__ == "__main__":
     trials = 3
     learning_rate = 0.1
     momentum = 0.9
-    batch_size = 28
+    batch_size = 128
+    results_dir = "results/fig_2"
 
     experiment(train_sizes, noise_levels, epochs, trials, args.train_path, args.test_path, learning_rate, momentum,
-               batch_size)
+               batch_size, results_dir)

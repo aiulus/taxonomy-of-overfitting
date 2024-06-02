@@ -6,7 +6,7 @@ import random
 from tqdm import tqdm
 import argparse
 
-from torch.utils.data import DataLoader, Subset
+from torch.utils.data import DataLoader, Subset, TensorDataset
 from torchvision import transforms
 import torch.nn as nn
 import torch.optim as optim
@@ -88,10 +88,12 @@ def experiment(train_sizes, noise_levels, epochs, trials, train_path, test_path,
             for trial in range(trials):
                 subset_indices = random.sample(range(len(train_dataset)), size)
                 subset = Subset(train_dataset, subset_indices)
+                subset_data, subset_labels = zip(*[(item[0], item[1]) for item in subset])
+                subset_data = torch.stack(subset_data)
+                subset_labels = torch.tensor(subset_labels)
+                noisy_labels = add_label_noise(subset_labels, noise, num_classes=2)
 
-                noisy_labels = add_label_noise(subset.targets, noise, num_classes=2)
-
-                train_loader = DataLoader(list(zip(subset, noisy_labels)), batch_size=batch_size, shuffle=True)
+                train_loader = DataLoader(TensorDataset(subset_data, noisy_labels), batch_size=batch_size, shuffle=True)
 
                 model = wide_resnet(depth=28, num_classes=2, widen_factor=10, dropRate=0.3).to(device)
                 criterion = nn.CrossEntropyLoss()
