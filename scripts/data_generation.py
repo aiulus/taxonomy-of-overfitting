@@ -132,7 +132,41 @@ def process_cifar():
 
     print("CIFAR-10 files saved successfully.")
 
+def process_svhn():
+    data_path = 'data/svhn'
+    os.makedirs(data_path, exist_ok=True)
 
+    transform = ToTensor()
+    svhn_train = datasets.SVHN(root=data_path, split='train', download=True, transform=transform)
+    svhn_test = datasets.SVHN(root=data_path, split='test', download=True, transform=transform)
+
+    vehicle_classes = [0, 1, 2, 3, 4]  # 0-4 digits as vehicles
+    animal_classes = [5, 6, 7, 8, 9]  # 5-9 digits as animals
+
+    torch.save(svhn_train, os.path.join(data_path, 'svhn_train.pth'))
+    torch.save(svhn_test, os.path.join(data_path, 'svhn_test.pth'))
+
+    def binarize_targets(dataset, vehicle_classes, animal_classes):
+        binarized_targets = []
+        for target in dataset.labels:
+            if target in vehicle_classes:
+                binarized_targets.append('vehicle')
+            elif target in animal_classes:
+                binarized_targets.append('animal')
+        return binarized_targets
+
+    binary_svhn_train_targets = binarize_targets(svhn_train, vehicle_classes, animal_classes)
+    binary_svhn_test_targets = binarize_targets(svhn_test, vehicle_classes, animal_classes)
+
+    binary_svhn_train = datasets.SVHN(root=data_path, split='train', download=False, transform=transform)
+    binary_svhn_train.labels = binary_svhn_train_targets
+    binary_svhn_test = datasets.SVHN(root=data_path, split='test', download=False, transform=transform)
+    binary_svhn_test.labels = binary_svhn_test_targets
+
+    torch.save(binary_svhn_train, os.path.join(data_path, 'binary_svhn_train.pth'))
+    torch.save(binary_svhn_test, os.path.join(data_path, 'binary_svhn_test.pth'))
+
+    print("SVHN files saved successfully.")
 
 if __name__ == "__main__":
     # Parse command-line arguments
@@ -140,6 +174,7 @@ if __name__ == "__main__":
     parser.add_argument("-s", "--synth", action="store_true", help="Flag to generate synthetic data.")
     parser.add_argument("-m", "--mnist", action="store_true", help="Flag to process MNIST dataset.")
     parser.add_argument("-c", "--cifar", action="store_true", help="Flag to process CIFAR-10 dataset.")
+    parser.add_argument("--svhn", action="store_true", help="Flag to process SVHN dataset.")
     parser.add_argument("-d", "--dimension", type=int, help="Dimension of the space (d-1 dimensional sphere). Required for synthetic data generation.")
     parser.add_argument("-N", "--points", type=int, help="Number of points to generate. Required for synthetic data generation.")
     parser.add_argument("-o", "--output-dir", type=str, default="data/synthetic",
@@ -160,6 +195,8 @@ if __name__ == "__main__":
         process_mnist()
     elif args.cifar:
         process_cifar()
+    elif args.svhn:
+        process_svhn()
     else:
         print("Please specify either --synth, --mnist, or --cifar flag.")
 
