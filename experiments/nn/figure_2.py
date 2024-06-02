@@ -5,25 +5,29 @@ import matplotlib.pyplot as plt
 import random
 from tqdm import tqdm
 import argparse
+from typing import Tuple, List, Dict
 
 from torch.utils.data import DataLoader, Subset, Dataset
 from torchvision import transforms
 import torch.nn as nn
 import torch.optim as optim
 
-# Import the Wide ResNet model (adjust the import based on your actual script)
 from libraries.wide_resnet.networks import wide_resnet
 
 
-# Load binary CIFAR-10 datasets
-def load_binary_cifar10(train_path, test_path):
+def load_binary_cifar10(train_path: str, test_path: str) -> Tuple[Dataset, Dataset]:
+    """
+    Load binary CIFAR-10 datasets from the given paths.
+    """
     train_dataset = torch.load(train_path)
     test_dataset = torch.load(test_path)
     return train_dataset, test_dataset
 
 
-# Add label noise
-def add_label_noise(labels, noise_level):
+def add_label_noise(labels: torch.Tensor, noise_level: float) -> torch.Tensor:
+    """
+    Add noise to the labels by flipping a certain percentage of them.
+    """
     noisy_labels = labels.clone()
     n_samples = len(labels)
     n_noisy = int(noise_level * n_samples)
@@ -36,13 +40,26 @@ def add_label_noise(labels, noise_level):
     return noisy_labels
 
 
-# Convert labels to binary (0 for animal, 1 for vehicle)
-def labels_to_binary(labels):
+def labels_to_binary(labels: torch.Tensor) -> torch.Tensor:
+    """
+    Convert labels to binary: 0 for animal, 1 for vehicle.
+    """
     return torch.tensor([1 if label == 'vehicle' else 0 for label in labels])
 
 
-# Train the model
-def train_model(model, train_loader, test_loader, criterion, optimizer, device, epochs, lr_schedule):
+def train_model(
+        model: nn.Module,
+        train_loader: DataLoader,
+        test_loader: DataLoader,
+        criterion: nn.Module,
+        optimizer: optim.Optimizer,
+        device: torch.device,
+        epochs: int,
+        lr_schedule: List[int]
+) -> Tuple[float, float]:
+    """
+    Train the model and evaluate its performance on the test set.
+    """
     model.train()
     for epoch in range(epochs):
         if epoch in lr_schedule:
@@ -73,15 +90,27 @@ def train_model(model, train_loader, test_loader, criterion, optimizer, device, 
     return test_loss, accuracy
 
 
-# Main experiment function
-def experiment(train_sizes, noise_levels, epochs, trials, train_path, test_path, lr, momentum, batch_size):
+def experiment(
+        train_sizes: List[int],
+        noise_levels: List[float],
+        epochs: int,
+        trials: int,
+        train_path: str,
+        test_path: str,
+        lr: float,
+        momentum: float,
+        batch_size: int
+) -> None:
+    """
+    Conduct the experiment with various training sizes, noise levels, and trials.
+    """
     train_dataset, test_dataset = load_binary_cifar10(train_path, test_path)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     transform = transforms.ToTensor()
 
     test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
 
-    all_results = {size: {noise: [] for noise in noise_levels} for size in train_sizes}
+    all_results: Dict[int, Dict[float, List[float]]] = {size: {noise: [] for noise in noise_levels} for size in train_sizes}
 
     for size in train_sizes:
         for noise in noise_levels:

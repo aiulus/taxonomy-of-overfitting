@@ -3,9 +3,13 @@ import matplotlib.pyplot as plt
 from sklearn.metrics import mean_squared_error
 from sklearn.preprocessing import FunctionTransformer
 from tqdm import tqdm
+from typing import List, Dict, Tuple
 
 
-def generate_data(d, N):
+def generate_data(d: int, N: int) -> np.ndarray:
+    """
+    Generate N points on a d-dimensional unit sphere.
+    """
     u = np.zeros(d)
     v = np.identity(d)
     points = np.random.multivariate_normal(mean=u, cov=v, size=N)
@@ -14,15 +18,27 @@ def generate_data(d, N):
     return S_d
 
 
-def gaussian_kernel_transformer(w=1.0):
-    def kernel(X):
+def gaussian_kernel_transformer(w: float = 1.0) -> FunctionTransformer:
+    """
+    Create a Gaussian kernel transformer with the given width w.
+    """
+    def kernel(X: np.ndarray) -> np.ndarray:
         pairwise_sq_dists = np.sum((X[:, np.newaxis, :] - X[np.newaxis, :, :]) ** 2, axis=-1)
         return np.exp(-w ** 2 * pairwise_sq_dists)
 
     return FunctionTransformer(kernel, validate=False)
 
 
-def kernel_ridge_regression(X_train, y_train, X_test, w=1.0, ridge=0.1):
+def kernel_ridge_regression(
+        X_train: np.ndarray,
+        y_train: np.ndarray,
+        X_test: np.ndarray,
+        w: float = 1.0,
+        ridge: float = 0.1
+) -> np.ndarray:
+    """
+    Perform kernel ridge regression using the Gaussian kernel.
+    """
     kernel_transformer = gaussian_kernel_transformer(w=w)
     K_train = kernel_transformer.transform(X_train)
     K_train += ridge * np.eye(K_train.shape[0])
@@ -32,7 +48,15 @@ def kernel_ridge_regression(X_train, y_train, X_test, w=1.0, ridge=0.1):
     return y_pred
 
 
-def experiment(d, sample_sizes, num_runs=100, w=1.0):
+def experiment(
+        d: int,
+        sample_sizes: List[int],
+        num_runs: int = 100,
+        w: float = 1.0
+) -> Dict[int, List[float]]:
+    """
+    Conduct the experiment for different sample sizes and compute the mean squared error.
+    """
     mse_results = {size: [] for size in sample_sizes}
 
     for _ in tqdm(range(num_runs), desc=f"Dimension {d}"):
@@ -49,7 +73,14 @@ def experiment(d, sample_sizes, num_runs=100, w=1.0):
     return mse_results
 
 
-def plot_results(results, sample_sizes, dimensions):
+def plot_results(
+        results: Dict[int, Dict[int, List[float]]],
+        sample_sizes: List[int],
+        dimensions: List[int]
+) -> None:
+    """
+    Plot the mean squared error results for different sample sizes and dimensions.
+    """
     plt.figure(figsize=(10, 6))
 
     for d, mse_results in results.items():
@@ -76,7 +107,7 @@ if __name__ == "__main__":
     sample_sizes = np.logspace(0.7, 4, num=50, dtype=int)
     dimensions = [5, 10, 15]
 
-    results = {}
+    results: Dict[int, Dict[int, List[float]]] = {}
     for d in dimensions:
         results[d] = experiment(d, sample_sizes, num_runs=100, w=1.0)
 

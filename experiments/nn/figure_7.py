@@ -11,19 +11,18 @@ from torchvision import transforms
 import torch.nn as nn
 import torch.optim as optim
 
-
 from libraries.wide_resnet.networks import wide_resnet
 
 
-# Load CIFAR-10 datasets
-def load_cifar10(train_path, test_path):
+# Load binary SVHN datasets
+def load_binary_svhn(train_path, test_path):
     train_dataset = torch.load(train_path)
     test_dataset = torch.load(test_path)
     return train_dataset, test_dataset
 
 
 # Add label noise
-def add_label_noise(labels, noise_level, num_classes=10):
+def add_label_noise(labels, noise_level, num_classes=2):
     noisy_labels = labels.clone()
     n_samples = len(labels)
     n_noisy = int(noise_level * n_samples)
@@ -37,13 +36,18 @@ def add_label_noise(labels, noise_level, num_classes=10):
     return noisy_labels
 
 
+# Convert labels to binary (0 for class 0, 1 for class 1)
+def labels_to_binary(labels):
+    return torch.tensor([1 if label == 'class1' else 0 for label in labels])
+
+
 # Train the model
 def train_model(model, train_loader, test_loader, criterion, optimizer, device, epochs, lr_schedule):
     model.train()
     for epoch in range(epochs):
         if epoch in lr_schedule:
             for param_group in optimizer.param_groups:
-                param_group['lr'] *= 0.2
+                param_group['lr'] *= 0.1
 
         for inputs, targets in train_loader:
             inputs, targets = inputs.to(device), targets.to(device)
@@ -71,7 +75,7 @@ def train_model(model, train_loader, test_loader, criterion, optimizer, device, 
 
 # Main experiment function
 def experiment(train_sizes, noise_levels, epochs, trials, train_path, test_path, lr, momentum, batch_size):
-    train_dataset, test_dataset = load_cifar10(train_path, test_path)
+    train_dataset, test_dataset = load_binary_svhn(train_path, test_path)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     transform = transforms.ToTensor()
 
@@ -85,11 +89,11 @@ def experiment(train_sizes, noise_levels, epochs, trials, train_path, test_path,
                 subset_indices = random.sample(range(len(train_dataset)), size)
                 subset = Subset(train_dataset, subset_indices)
 
-                noisy_labels = add_label_noise(subset.targets, noise, num_classes=10)
+                noisy_labels = add_label_noise(subset.targets, noise, num_classes=2)
 
                 train_loader = DataLoader(list(zip(subset, noisy_labels)), batch_size=batch_size, shuffle=True)
 
-                model = wide_resnet(depth=28, num_classes=10, widen_factor=10, dropRate=0.3).to(device)
+                model = wide_resnet(depth=28, num_classes=2, widen_factor=10, dropRate=0.3).to(device)
                 criterion = nn.CrossEntropyLoss()
                 optimizer = optim.SGD(model.parameters(), lr=lr, momentum=momentum)
 
@@ -113,7 +117,7 @@ def experiment(train_sizes, noise_levels, epochs, trials, train_path, test_path,
         stds = [avg_results[size][noise][1] for noise in noise_levels_list]
         plt.errorbar(noise_levels_list, means, yerr=stds, label=f'n={size}', capsize=5)
 
-    plt.title("DNN Noise Profile (CIFAR-10)")
+    plt.title("0/1 SVHN, overfit")
     plt.xlabel("Label Noise")
     plt.ylabel("Test Error")
     plt.legend()
@@ -122,18 +126,18 @@ def experiment(train_sizes, noise_levels, epochs, trials, train_path, test_path,
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Run Wide ResNet experiment with CIFAR-10.")
-    parser.add_argument("--train-path", type=str, required=True, help="Path to CIFAR-10 train set.")
-    parser.add_argument("--test-path", type=str, required=True, help="Path to CIFAR-10 test set.")
+    parser = argparse.ArgumentParser(description="Run Wide ResNet experiment with binary SVHN.")
+    parser.add_argument("--train-path", type=str, required=True, help="Path to binary SVHN train set.")
+    parser.add_argument("--test-path", type=str, required=True, help="Path to binary SVHN test set.")
     args = parser.parse_args()
 
-    train_sizes = [5000, 10000, 30000, 50000]
-    noise_levels = np.arange(0, 0.91, 0.01)
+    train_sizes = [9000, 18000, 36000, 70000]
+    noise_levels = np.arange(0, 0.51, 0.01)
     epochs = 60
     trials = 3
     learning_rate = 0.1
     momentum = 0.9
-    batch_size = 28
+    batch_size = 128
 
     experiment(train_sizes, noise_levels, epochs, trials, args.train_path, args.test_path, learning_rate, momentum,
                batch_size)
