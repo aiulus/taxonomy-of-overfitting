@@ -174,7 +174,7 @@ def experiment(
     plt.ylabel("Test Error")
     plt.legend()
     plt.grid(True)
-    plt_path = os.path.join(graph_dir, 'results_plot.png')
+    plt_path = os.path.join(graph_dir, 'figure_2.png')
     plt.savefig(plt_path)
     plt.show()
 
