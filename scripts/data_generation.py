@@ -88,6 +88,49 @@ def process_mnist():
 
     print("MNIST files saved successfully.")
 
+def process_cifar():
+    data_path = 'data/cifar'
+    os.makedirs(data_path, exist_ok=True)
+
+    transform = ToTensor()
+    cifar_train = datasets.CIFAR10(root=data_path, train=True, download=True, transform=transform)
+    cifar_test = datasets.CIFAR10(root=data_path, train=False, download=True, transform=transform)
+
+    vehicle_classes = [0, 1, 8, 9]  # airplanes, cars, ships, trucks
+    animal_classes = [2, 3, 4, 5, 6, 7]  # birds, cats, deer, dogs, frogs, horses
+
+    def binarize_targets(dataset, vehicle_classes, animal_classes):
+        binarized_targets = []
+        for target in dataset.targets:
+            if target in vehicle_classes:
+                binarized_targets.append('vehicle')
+            elif target in animal_classes:
+                binarized_targets.append('animal')
+        return binarized_targets
+
+    binary_cifar_train_targets = binarize_targets(cifar_train, vehicle_classes, animal_classes)
+    binary_cifar_test_targets = binarize_targets(cifar_test, vehicle_classes, animal_classes)
+
+    class BinaryCIFAR10(datasets.CIFAR10):
+        def __init__(self, *args, binarized_targets=None, **kwargs):
+            super().__init__(*args, **kwargs)
+            self.binarized_targets = binarized_targets
+
+        def __getitem__(self, index):
+            img, _ = super().__getitem__(index)
+            target = self.binarized_targets[index]
+            return img, target
+
+    binary_cifar_train = BinaryCIFAR10(root=data_path, train=True, download=False, transform=transform, binarized_targets=binary_cifar_train_targets)
+    binary_cifar_test = BinaryCIFAR10(root=data_path, train=False, download=False, transform=transform, binarized_targets=binary_cifar_test_targets)
+
+    torch.save(binary_cifar_train, os.path.join(data_path, 'binary_cifar_train.pth'))
+    torch.save(binary_cifar_test, os.path.join(data_path, 'binary_cifar_test.pth'))
+
+    print("CIFAR-10 files saved successfully.")
+
+
+
 
 if __name__ == "__main__":
     # Parse command-line arguments
