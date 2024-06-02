@@ -4,6 +4,8 @@ from sklearn.metrics import mean_squared_error
 from sklearn.preprocessing import FunctionTransformer
 from tqdm import tqdm
 from typing import List, Dict, Tuple
+import os
+import json
 
 
 def generate_data(d: int, N: int) -> np.ndarray:
@@ -22,6 +24,7 @@ def gaussian_kernel_transformer(w: float = 1.0) -> FunctionTransformer:
     """
     Create a Gaussian kernel transformer with the given width w.
     """
+
     def kernel(X: np.ndarray) -> np.ndarray:
         pairwise_sq_dists = np.sum((X[:, np.newaxis, :] - X[np.newaxis, :, :]) ** 2, axis=-1)
         return np.exp(-w ** 2 * pairwise_sq_dists)
@@ -83,6 +86,11 @@ def plot_results(
     """
     plt.figure(figsize=(10, 6))
 
+    if not os.path.exists("results/fig_4/graphs"):
+        os.makedirs("results/fig_4/graphs")
+    if not os.path.exists("results/fig_4/logs"):
+        os.makedirs("results/fig_4/logs")
+
     for d, mse_results in results.items():
         means = [np.mean(mse_results[size]) for size in sample_sizes]
         quantiles_25 = [np.quantile(mse_results[size], 0.25) for size in sample_sizes]
@@ -90,6 +98,11 @@ def plot_results(
 
         plt.plot(sample_sizes, means, label=f'd={d}')
         plt.fill_between(sample_sizes, quantiles_25, quantiles_75, alpha=0.2)
+
+        # Save the results data to a JSON file
+        log_file_path = os.path.join("results/fig_4/logs", f"results_d{d}.json")
+        with open(log_file_path, 'w') as log_file:
+            json.dump(mse_results, log_file)
 
     plt.xscale('log')
     plt.yscale('log')
@@ -100,7 +113,10 @@ def plot_results(
     plt.yticks([1, 0.1, 0.01, 0.001], labels=['$10^0$', '$10^{-1}$', '$10^{-2}$', '$10^{-3}$'])
     plt.grid(True, which='both', linestyle='--', linewidth=0.5)
     plt.legend()
-    plt.show()
+
+    plot_file_path = os.path.join("results/fig_4/graphs", "fig_4.png")
+    plt.savefig(plot_file_path)
+    plt.close()
 
 
 if __name__ == "__main__":
