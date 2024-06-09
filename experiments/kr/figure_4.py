@@ -6,15 +6,14 @@ from tqdm import tqdm
 from typing import List, Dict, Tuple
 import os
 import json
+from concurrent.futures import ProcessPoolExecutor
 
 
 def generate_data(d: int, N: int) -> np.ndarray:
     """
     Generate N points on a d-dimensional unit sphere.
     """
-    u = np.zeros(d)
-    v = np.identity(d)
-    points = np.random.multivariate_normal(mean=u, cov=v, size=N)
+    points = np.random.normal(0, 1, (N, d))
     norms = np.linalg.norm(points, axis=1, keepdims=True)
     S_d = points / norms
     return S_d
@@ -46,9 +45,27 @@ def kernel_ridge_regression(
     K_train = kernel_transformer.transform(X_train)
     K_train += ridge * np.eye(K_train.shape[0])
     alpha = np.linalg.solve(K_train, y_train)
-    K_test = np.exp(-w ** 2 * np.sum((X_test[:, np.newaxis, :] - X_train[np.newaxis, :, :]) ** 2, axis=-1))
+
+    pairwise_sq_dists = np.sum((X_test[:, np.newaxis, :] - X_train[np.newaxis, :, :]) ** 2, axis=-1)
+    K_test = np.exp(-w ** 2 * pairwise_sq_dists)
+
     y_pred = K_test @ alpha
     return y_pred
+
+
+def run_experiment(d: int, size: int, w: float) -> Tuple[int, float]:
+    """
+    Run a single iteration of the experiment for a given dimension and sample size.
+    """
+    X_train = generate_data(d, size)
+    y_train = np.random.normal(0, 1, size)
+    X_test = generate_data(d, 100)  # Test set size fixed to 100
+    y_test = np.zeros(100)  # Clean labels
+
+    y_pred = kernel_ridge_regression(X_train, y_train, X_test, w=w, ridge=0.1)
+    mse = mean_squared_error(y_test, y_pred)
+
+    return size, mse
 
 
 def experiment(
@@ -62,15 +79,14 @@ def experiment(
     """
     mse_results = {size: [] for size in sample_sizes}
 
-    for _ in tqdm(range(num_runs), desc=f"Dimension {d}"):
-        for size in sample_sizes:
-            X_train = generate_data(d, size)
-            y_train = np.random.normal(0, 1, size)
-            X_test = generate_data(d, 100)  # Test set size fixed to 100
-            y_test = np.zeros(100)  # Clean labels
+    with ProcessPoolExecutor() as executor:
+        futures = []
+        for _ in range(num_runs):
+            for size in sample_sizes:
+                futures.append(executor.submit(run_experiment, d, size, w))
 
-            y_pred = kernel_ridge_regression(X_train, y_train, X_test, w=w, ridge=0.1)
-            mse = mean_squared_error(y_test, y_pred)
+        for future in tqdm(futures, desc=f"Dimension {d}"):
+            size, mse = future.result()
             mse_results[size].append(mse)
 
     return mse_results
